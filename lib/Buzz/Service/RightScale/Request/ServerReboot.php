@@ -2,7 +2,7 @@
 
 namespace Buzz\Service\RightScale\Request;
 
-class ServerStart extends AbstractServerRequest
+class ServerReboot extends AbstractServerRequest
 {
   public function __construct($serverId)
   {
