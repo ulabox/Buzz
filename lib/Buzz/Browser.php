@@ -46,16 +46,18 @@ class Browser
 
     /**
      * Sends a request and adds the call to the journal.
-     * 
+     *
      * @param string $url     The URL to call
      * @param string $method  The request method to use
      * @param array  $headers An array of request headers
      * @param string $content The request content
-     * 
+     *
      * @return Message\Response The response object
      */
     public function call($url, $method, $headers = array(), $content = '')
     {
+        $content = str_replace('+', '%2B', $content);
+        
         $request = $this->createRequest();
 
         $request->setMethod($method);
@@ -68,10 +70,10 @@ class Browser
 
     /**
      * Sends a request and records it to the journal.
-     * 
+     *
      * @param Message\Request  $request  A request object
      * @param Message\Response $response A response object
-     * 
+     *
      * @return Message\Response A response object
      */
     public function send(Message\Request $request, Message\Response $response = null)
@@ -92,7 +94,7 @@ class Browser
 
     /**
      * Returns a DOMDocument for the current response.
-     * 
+     *
      * @return DOMDocument
      */
     public function getDom()
