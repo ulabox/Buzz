@@ -2,7 +2,7 @@
 
 namespace Buzz\Message;
 
-class Request extends AbstractMessage
+class Request extends AbstractMessage implements RequestInterface
 {
     const METHOD_GET    = 'GET';
     const METHOD_HEAD   = 'HEAD';
@@ -10,28 +10,28 @@ class Request extends AbstractMessage
     const METHOD_PUT    = 'PUT';
     const METHOD_DELETE = 'DELETE';
 
-    protected $method;
-    protected $resource;
-    protected $host;
-    protected $protocolVersion = 1.0;
+    private $method;
+    private $resource;
+    private $host;
+    private $protocolVersion = 1.0;
 
     /**
      * Constructor.
-     * 
+     *
      * @param string $method
      * @param string $resource
      * @param string $host
      */
     public function __construct($method = self::METHOD_GET, $resource = '/', $host = null)
     {
-        $this->setMethod($method);
-        $this->setResource($resource);
-        $this->setHost($host);
+        $this->method = strtoupper($method);
+        $this->resource = $resource;
+        $this->host = $host;
     }
 
     public function setMethod($method)
     {
-        $this->method = $method;
+        $this->method = strtoupper($method);
     }
 
     public function getMethod()
@@ -71,7 +71,7 @@ class Request extends AbstractMessage
 
     /**
      * A convenience method for getting the full URL of the current request.
-     * 
+     *
      * @return string
      */
     public function getUrl()
@@ -81,9 +81,9 @@ class Request extends AbstractMessage
 
     /**
      * A convenience method for populating the current request from a URL.
-     * 
+     *
      * @param string $url A URL
-     * 
+     *
      * @throws InvalidArgumentException If the URL is invalid
      */
     public function fromUrl($url)
@@ -116,7 +116,7 @@ class Request extends AbstractMessage
 
     /**
      * Returns true if the current request is secure.
-     * 
+     *
      * @return boolean
      */
     public function isSecure()
@@ -125,15 +125,53 @@ class Request extends AbstractMessage
     }
 
     /**
+     * Merges cookie headers on the way out.
+     */
+    public function getHeaders()
+    {
+        return $this->mergeCookieHeaders(parent::getHeaders());
+    }
+
+    /**
      * Returns a string representation of the current request.
-     * 
+     *
      * @return string
      */
     public function __toString()
     {
-        return implode(PHP_EOL, array(
-            sprintf('%s %s HTTP/%.1f', $this->getMethod(), $this->getResource(), $this->getProtocolVersion()),
-            'Host: '.$this->getHost(),
-        )).PHP_EOL.parent::__toString();
+        $string = sprintf("%s %s HTTP/%.1f\r\n", $this->getMethod(), $this->getResource(), $this->getProtocolVersion());
+
+        if ($host = $this->getHost()) {
+            $string .= 'Host: '.$host."\r\n";
+        }
+
+        if ($parent = trim(parent::__toString())) {
+            $string .= $parent."\r\n";
+        }
+
+        return $string;
+    }
+
+    // private
+
+    private function mergeCookieHeaders(array $headers)
+    {
+        $cookieHeader = null;
+        $needle = 'Cookie:';
+
+        foreach ($headers as $i => $header) {
+            if (0 !== strpos($header, $needle)) {
+                continue;
+            }
+
+            if (null === $cookieHeader) {
+                $cookieHeader = $i;
+            } else {
+                $headers[$cookieHeader] .= '; '.trim(substr($header, strlen($needle)));
+                unset($headers[$i]);
+            }
+        }
+
+        return array_values($headers);
     }
 }

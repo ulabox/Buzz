@@ -2,20 +2,20 @@
 
 namespace Buzz\Message;
 
-abstract class AbstractMessage
+abstract class AbstractMessage implements MessageInterface
 {
-    protected $headers = array();
-    protected $content;
+    private $headers = array();
+    private $content;
 
     /**
      * Returns the value of a header.
-     * 
+     *
      * @param string         $name
      * @param string|boolean $glue Glue for implode, or false to return an array
-     * 
+     *
      * @return string|array|null
      */
-    public function getHeader($name, $glue = PHP_EOL)
+    public function getHeader($name, $glue = "\r\n")
     {
         $needle = $name.':';
 
@@ -35,9 +35,9 @@ abstract class AbstractMessage
 
     /**
      * Returns a header's attributes.
-     * 
+     *
      * @param string $name A header name
-     * 
+     *
      * @return array An associative array of attributes
      */
     public function getHeaderAttributes($name)
@@ -59,10 +59,10 @@ abstract class AbstractMessage
 
     /**
      * Returns the value of a particular header attribute.
-     * 
+     *
      * @param string $header    A header name
      * @param string $attribute An attribute name
-     * 
+     *
      * @return string|null The value of the attribute or null if it isn't set
      */
     public function getHeaderAttribute($header, $attribute)
@@ -76,7 +76,7 @@ abstract class AbstractMessage
 
     /**
      * Returns the current message as a DOMDocument.
-     * 
+     *
      * @return DOMDocument
      */
     public function toDomDocument()
@@ -123,10 +123,10 @@ abstract class AbstractMessage
 
     public function __toString()
     {
-        $string = implode(PHP_EOL, $this->getHeaders()).PHP_EOL;
+        $string = implode("\r\n", $this->getHeaders())."\r\n";
 
-        if ($this->getContent()) {
-            $string .= PHP_EOL.$this->getContent().PHP_EOL;
+        if ($content = $this->getContent()) {
+            $string .= "\r\n$content\r\n";
         }
 
         return $string;

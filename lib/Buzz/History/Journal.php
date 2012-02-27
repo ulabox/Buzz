@@ -4,14 +4,21 @@ namespace Buzz\History;
 
 use Buzz\Message;
 
-class Journal implements \Countable
+class Journal implements \Countable, \IteratorAggregate
 {
-    protected $entries = array();
-    protected $limit = 10;
+    private $entries = array();
+    private $limit = 10;
 
-    public function record(Message\Request $request, Message\Response $response)
+    /**
+     * Records an entry in the journal.
+     *
+     * @param Message\Request  $request  The request
+     * @param Message\Response $response The response
+     * @param integer          $duration The duration in seconds
+     */
+    public function record(Message\Request $request, Message\Response $response, $duration = null)
     {
-        $this->addEntry(new Entry($request, $response));
+        $this->addEntry(new Entry($request, $response, $duration));
     }
 
     public function addEntry(Entry $entry)
@@ -54,5 +61,10 @@ class Journal implements \Countable
     public function getLimit()
     {
         return $this->limit;
+    }
+
+    public function getIterator()
+    {
+        return new \ArrayIterator(array_reverse($this->entries));
     }
 }

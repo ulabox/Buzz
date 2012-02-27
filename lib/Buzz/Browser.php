@@ -3,20 +3,21 @@
 namespace Buzz;
 
 use Buzz\Client;
-use Buzz\History;
+use Buzz\Listener;
 use Buzz\Message;
 
 class Browser
 {
-    protected $client;
-    protected $journal;
-    protected $requestFactory;
-    protected $responseFactory;
+    private $client;
+    private $factory;
+    private $listener;
+    private $lastRequest;
+    private $lastResponse;
 
-    public function __construct(Client\ClientInterface $client = null, History\Journal $journal = null)
+    public function __construct(Client\ClientInterface $client = null, Message\FactoryInterface $factory = null)
     {
-        $this->setClient($client ?: new Client\FileGetContents());
-        $this->setJournal($journal ?: new History\Journal());
+        $this->client = $client ?: new Client\FileGetContents();
+        $this->factory = $factory ?: new Message\Factory();
     }
 
     public function get($url, $headers = array())
@@ -45,18 +46,18 @@ class Browser
     }
 
     /**
-     * Sends a request and adds the call to the journal.
-     * 
+     * Sends a request.
+     *
      * @param string $url     The URL to call
      * @param string $method  The request method to use
      * @param array  $headers An array of request headers
      * @param string $content The request content
-     * 
+     *
      * @return Message\Response The response object
      */
     public function call($url, $method, $headers = array(), $content = '')
     {
-        $request = $this->createRequest();
+        $request = $this->factory->createRequest();
 
         $request->setMethod($method);
         $request->fromUrl($url);
@@ -67,37 +68,65 @@ class Browser
     }
 
     /**
-     * Sends a request and records it to the journal.
-     * 
+     * Sends a form request.
+     *
+     * @param string $url     The URL to submit to
+     * @param array  $fields  An array of fields
+     * @param string $method  The request method to use
+     * @param array  $headers An array of request headers
+     *
+     * @return Message\Response The response object
+     */
+    public function submit($url, array $fields, $method = Message\Request::METHOD_POST, $headers = array())
+    {
+        $request = $this->factory->createFormRequest();
+
+        $request->setMethod($method);
+        $request->fromUrl($url);
+        $request->addHeaders($headers);
+        $request->setFields($fields);
+
+        return $this->send($request);
+    }
+
+    /**
+     * Sends a request.
+     *
      * @param Message\Request  $request  A request object
      * @param Message\Response $response A response object
-     * 
+     *
      * @return Message\Response A response object
      */
     public function send(Message\Request $request, Message\Response $response = null)
     {
         if (null === $response) {
-            $response = $this->createResponse();
+            $response = $this->factory->createResponse();
         }
 
-        if ($request instanceof BrowserAwareInterface) {
-            $request->setBrowser($this);
+        if ($this->listener) {
+            $this->listener->preSend($request);
         }
 
-        $this->getClient()->send($request, $response);
-        $this->getJournal()->record($request, $response);
+        $this->client->send($request, $response);
+
+        $this->lastRequest = $request;
+        $this->lastResponse = $response;
+
+        if ($this->listener) {
+            $this->listener->postSend($request, $response);
+        }
 
         return $response;
     }
 
-    /**
-     * Returns a DOMDocument for the current response.
-     * 
-     * @return DOMDocument
-     */
-    public function getDom()
+    public function getLastRequest()
     {
-        return $this->getJournal()->getLastResponse()->toDomDocument();
+        return $this->lastRequest;
+    }
+
+    public function getLastResponse()
+    {
+        return $this->lastResponse;
     }
 
     public function setClient(Client\ClientInterface $client)
@@ -110,51 +139,37 @@ class Browser
         return $this->client;
     }
 
-    public function setJournal(History\Journal $journal)
+    public function setMessageFactory(Message\FactoryInterface $factory)
     {
-        $this->journal = $journal;
+        $this->factory = $factory;
     }
 
-    public function getJournal()
+    public function getMessageFactory()
     {
-        return $this->journal;
+        return $this->factory;
     }
 
-    public function setRequestFactory($callable)
+    public function setListener(Listener\ListenerInterface $listener)
     {
-        $this->requestFactory = $callable;
+        $this->listener = $listener;
     }
 
-    public function getRequestFactory()
+    public function getListener()
     {
-        return $this->requestFactory;
+        return $this->listener;
     }
 
-    public function setResponseFactory($callable)
+    public function addListener(Listener\ListenerInterface $listener)
     {
-        $this->responseFactory = $callable;
-    }
-
-    public function getResponseFactory()
-    {
-        return $this->responseFactory;
-    }
-
-    public function createRequest()
-    {
-        if ($callable = $this->getRequestFactory()) {
-          return $callable();
+        if (!$this->listener) {
+            $this->listener = $listener;
+        } elseif ($this->listener instanceof Listener\ListenerChain) {
+            $this->listener->addListener($listener);
+        } else {
+            $this->listener = new Listener\ListenerChain(array(
+                $this->listener,
+                $listener,
+            ));
         }
-
-        return new Message\Request();
-    }
-
-    public function createResponse()
-    {
-        if ($callable = $this->getResponseFactory()) {
-          return $callable();
-        }
-
-        return new Message\Response();
     }
 }
